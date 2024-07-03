@@ -272,7 +272,6 @@ Inserts an e-node in an [`EGraph`](@ref)
 """
 function add!(g::EGraph{ExpressionType,Analysis}, n::VecExpr, should_copy::Bool)::Id where {ExpressionType,Analysis}
   canonicalize!(g, n)
-  h = IdKey(v_hash(n))
 
   haskey(g.memo, n) && return g.memo[n]
 
@@ -338,7 +337,7 @@ function addexpr!(g::EGraph, se)::Id
     end
     n
   else # constant enode
-    Id[Id(0), Id(0), Id(0), add_constant!(g, e)]
+    VecExpr(Id[Id(0), Id(0), Id(0), add_constant!(g, e)])
   end
   id = add!(g, n, false)
   return id
@@ -432,7 +431,6 @@ function process_unions!(g::EGraph{ExpressionType,AnalysisType})::Int where {Exp
     while !isempty(g.pending)
       (node::VecExpr, eclass_id::Id) = pop!(g.pending)
       canonicalize!(g, node)
-      h = IdKey(v_hash(node))
       if haskey(g.memo, node)
         old_class_id = g.memo[node]
         g.memo[node] = eclass_id
