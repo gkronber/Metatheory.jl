@@ -73,7 +73,7 @@ end
 
 """The hash of the e-node."""
 @inline v_hash(n::VecExpr)::Id = @inbounds n[1]
-Base.hash(e::VecExpr) == v_hash(e) # TODO this is piracy
+Base.hash(e::VecExpr) = v_hash(e) # TODO this is piracy
 # Base.(==)(a::VecExpr, b::VecExpr) = a == b
 
 """Set e-node hash to zero."""
