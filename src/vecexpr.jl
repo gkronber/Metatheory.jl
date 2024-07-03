@@ -73,6 +73,8 @@ end
 
 """The hash of the e-node."""
 @inline v_hash(n::VecExpr)::Id = @inbounds n[1]
+Base.hash(e::VecExpr) == v_hash(e) # TODO this is piracy
+# Base.(==)(a::VecExpr, b::VecExpr) = a == b
 
 """Set e-node hash to zero."""
 @inline v_unset_hash!(n::VecExpr)::Id = @inbounds (n[1] = Id(0))
@@ -104,6 +106,7 @@ end
 v_pair(a::UInt64, b::UInt64) = UInt128(a) << 64 | b
 v_pair_first(p::UInt128)::UInt64 = UInt64(p >> 64)
 v_pair_last(p::UInt128)::UInt64 = UInt64(p & 0xffffffffffffffff)
+
 
 
 end
