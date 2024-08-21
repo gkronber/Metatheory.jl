@@ -28,6 +28,8 @@ export Id,
 
 const Id = UInt64
 
+vexpr_created = 0
+
 """
     struct VecExpr
       data::Vector{Id}
@@ -45,6 +47,11 @@ The hash value for the VecExpr is cached in the first position for faster lookup
 """
 struct VecExpr
   data::Vector{Id}
+  
+  function VecExpr(data)
+    global vexpr_created += 1
+    new(data) 
+  end
 end
 
 const VECEXPR_FLAG_ISTREE = 0x01
@@ -65,26 +72,33 @@ const VECEXPR_META_LENGTH = 4
 """Number of children in the e-node."""
 @inline v_arity(n::VecExpr)::Int = length(n.data) - VECEXPR_META_LENGTH
 
+
+cached_hash_access = 0
+cached_hash_computation = 0
 """
 Compute the hash of a `VecExpr` and store it as the first element.
 """
 @inline function v_hash!(n::VecExpr)::Id
   if iszero(n.data[1])
     n.data[1] = hash(@view n.data[2:end])
+    global cached_hash_computation += 1
   else
+    global cached_hash_access += 1
     # h = hash(@view n[2:end])
     # @assert h == n[1]
     n.data[1]
   end
 end
 
+hash_calls = 0
 """The hash of the e-node."""
-@inline v_hash(n::VecExpr)::Id = @inbounds n.data[1]
+@inline v_hash(n::VecExpr)::Id = begin global hash_calls += 1; @inbounds n.data[1] end
 Base.hash(n::VecExpr) = v_hash(n) # IdKey not necessary here
 Base.:(==)(a::VecExpr, b::VecExpr) = (@view a.data[2:end]) == (@view b.data[2:end])
 
 """Set e-node hash to zero."""
-@inline v_unset_hash!(n::VecExpr)::Id = @inbounds (n.data[1] = Id(0))
+unset_hash_calls = 0
+@inline v_unset_hash!(n::VecExpr)::Id = begin global unset_hash_calls += 1; @inbounds (n.data[1] = Id(0)) end
 
 """E-class IDs of the children of the e-node."""
 @inline v_children(n::VecExpr) = @view n.data[(VECEXPR_META_LENGTH + 1):end]
@@ -99,8 +113,11 @@ Base.:(==)(a::VecExpr, b::VecExpr) = (@view a.data[2:end]) == (@view b.data[2:en
 "Update the E-Node operation ID."
 @inline v_set_head!(n::VecExpr, h::Id) = @inbounds (n.data[VECEXPR_META_LENGTH] = h)
 
+v_new_calls = 0
+v_copy_calls = 0
 """Construct a new, empty `VecExpr` with `len` children."""
 @inline function v_new(len::Int)::VecExpr
+  global v_new_calls += 1
   n = VecExpr(Vector{Id}(undef, len + VECEXPR_META_LENGTH))
   v_unset_hash!(n)
   v_unset_flags!(n)
@@ -117,7 +134,7 @@ v_pair_last(p::UInt128)::UInt64 = UInt64(p & 0xffffffffffffffff)
 @inline Base.length(n::VecExpr) = length(n.data)
 @inline Base.getindex(n::VecExpr, i) = n.data[i]
 @inline Base.setindex!(n::VecExpr, val, i) = n.data[i] = val
-@inline Base.copy(n::VecExpr) = VecExpr(copy(n.data))
+@inline Base.copy(n::VecExpr) = begin global v_copy_calls += 1; VecExpr(copy(n.data)) end
 @inline Base.lastindex(n::VecExpr) = lastindex(n.data)
 @inline Base.firstindex(n::VecExpr) = firstindex(n.data)
 

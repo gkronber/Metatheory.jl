@@ -250,10 +250,14 @@ function canonicalize!(g::EGraph, n::VecExpr)
   n
 end
 
+memo_lookups = 0
+memo_add = 0
+
 function lookup(g::EGraph, n::VecExpr)::Id
   canonicalize!(g, n)
   h = IdKey(v_hash(n))
 
+  global memo_lookups += 1
   haskey(g.memo, n) ? find(g, g.memo[n]) : 0
 end
 
@@ -273,6 +277,7 @@ Inserts an e-node in an [`EGraph`](@ref)
 function add!(g::EGraph{ExpressionType,Analysis}, n::VecExpr, should_copy::Bool)::Id where {ExpressionType,Analysis}
   canonicalize!(g, n)
 
+  global memo_lookups += 1
   haskey(g.memo, n) && return g.memo[n]
 
   if should_copy
@@ -287,6 +292,7 @@ function add!(g::EGraph{ExpressionType,Analysis}, n::VecExpr, should_copy::Bool)
     end
   end
 
+  global memo_add += 1
   g.memo[n] = id
 
   add_class_by_op(g, n, id)
@@ -431,8 +437,10 @@ function process_unions!(g::EGraph{ExpressionType,AnalysisType})::Int where {Exp
     while !isempty(g.pending)
       (node::VecExpr, eclass_id::Id) = pop!(g.pending)
       canonicalize!(g, node)
+      global memo_lookups += 1
       if haskey(g.memo, node)
         old_class_id = g.memo[node]
+        global memo_add += 1
         g.memo[node] = eclass_id
         did_something = union!(g, old_class_id, eclass_id)
         # TODO unique! can node dedup be moved here? compare performance
