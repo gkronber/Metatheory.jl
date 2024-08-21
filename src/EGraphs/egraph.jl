@@ -258,7 +258,9 @@ function lookup(g::EGraph, n::VecExpr)::Id
   h = IdKey(v_hash(n))
 
   global memo_lookups += 1
-  haskey(g.memo, n) ? find(g, g.memo[n]) : 0
+  # haskey(g.memo, n) ? find(g, g.memo[n]) : 0
+  id = get(g.memo, n, zero(Id))
+  iszero(id) ? id : find(g, id)
 end
 
 
@@ -278,7 +280,9 @@ function add!(g::EGraph{ExpressionType,Analysis}, n::VecExpr, should_copy::Bool)
   canonicalize!(g, n)
 
   global memo_lookups += 1
-  haskey(g.memo, n) && return g.memo[n]
+  # haskey(g.memo, n) && return g.memo[n]
+  existing_id = get(g.memo, n, zero(Id))
+  iszero(existing_id) || return existing_id
 
   if should_copy
     n = copy(n)
@@ -437,11 +441,9 @@ function process_unions!(g::EGraph{ExpressionType,AnalysisType})::Int where {Exp
     while !isempty(g.pending)
       (node::VecExpr, eclass_id::Id) = pop!(g.pending)
       canonicalize!(g, node)
-      global memo_lookups += 1
-      if haskey(g.memo, node)
-        old_class_id = g.memo[node]
-        global memo_add += 1
-        g.memo[node] = eclass_id
+      global memo_add += 1
+      old_class_id = get!(g.memo, node, eclass_id)
+      if old_class_id != eclass_id
         did_something = union!(g, old_class_id, eclass_id)
         # TODO unique! can node dedup be moved here? compare performance
         # did_something && unique!(g[eclass_id].nodes)
