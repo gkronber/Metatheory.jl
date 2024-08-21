@@ -12,7 +12,17 @@ end
 UniqueQueue{T}() where {T} = UniqueQueue{T}(Set{T}(), T[])
 
 function Base.push!(uq::UniqueQueue{T}, x::T) where {T}
-  if in!(x, uq.set)
+  
+  # in! is available from Julia 1.11
+  function in!(x::T, s::Set{T})
+    idx, sh = Base.ht_keyindex2_shorthash!(s.dict, x)
+    idx > 0 && return true
+    Base._setindex!(s.dict, nothing, x, -idx, sh)
+    
+    false
+  end
+  
+  if !in!(x, uq.set) 
     push!(uq.vec, x)
   end
 end
