@@ -12,8 +12,7 @@ end
 UniqueQueue{T}() where {T} = UniqueQueue{T}(Set{T}(), T[])
 
 function Base.push!(uq::UniqueQueue{T}, x::T) where {T}
-  if !(x in uq.set)
-    push!(uq.set, x)
+  if in!(x, uq.set)
     push!(uq.vec, x)
   end
 end
