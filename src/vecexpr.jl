@@ -93,7 +93,8 @@ end
 hash_calls = 0
 """The hash of the e-node."""
 @inline v_hash(n::VecExpr)::Id = begin global hash_calls += 1; @inbounds n.data[1] end
-Base.hash(n::VecExpr) = v_hash(n) # IdKey not necessary here
+# Base.hash(n::VecExpr) = v_hash(n) # IdKey not necessary here
+Base.hash(n::VecExpr, h::UInt) = hash(v_hash(n),h)
 Base.:(==)(a::VecExpr, b::VecExpr) = (@view a.data[2:end]) == (@view b.data[2:end])
 
 """Set e-node hash to zero."""
