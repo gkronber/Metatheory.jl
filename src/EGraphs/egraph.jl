@@ -225,16 +225,14 @@ Returns the canonical e-class id for a given e-class.
 @inline Base.getindex(g::EGraph, i::Id) = g.classes[IdKey(find(g, i))]
 
 function canonicalize!(g::EGraph, n::VecExpr)
-  # orig = copy(n)
-  # inmemo = any(entry -> objectid(entry) == objectid(n), keys(g.memo))
-  v_isexpr(n) || @goto ret
-  for i in (VECEXPR_META_LENGTH + 1):length(n)
-    @inbounds n[i] = find(g, n[i])
+  if v_isexpr(n)
+    # orig = copy(n)
+    # inmemo = any(entry -> objectid(entry) == objectid(n), keys(g.memo))
+    for i in (VECEXPR_META_LENGTH + 1):length(n)
+      @inbounds n[i] = find(g, n[i])
+    end
+    # @assert orig == n || !inmemo
   end
-  v_unset_hash!(n)
-  @label ret
-  v_hash!(n)
-  # @assert orig == n || !inmemo
   n
 end
 
@@ -305,7 +303,7 @@ function addexpr!(g::EGraph, se)::Id
   se isa EClass && return se.id
   e = preprocess(se)
 
-  isexpr(e) || return add!(g, VecExpr(Id[Id(0), Id(0), Id(0), add_constant!(g, e)]), false)
+  isexpr(e) || return add!(g, VecExpr(Id[Id(0), Id(0), add_constant!(g, e)]), false)
 
   args = iscall(e) ? arguments(e) : children(e)
   ar = length(args)
