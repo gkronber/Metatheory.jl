@@ -226,12 +226,9 @@ Returns the canonical e-class id for a given e-class.
 
 function canonicalize!(g::EGraph, n::VecExpr)
   if v_isexpr(n)
-    # orig = copy(n)
-    # inmemo = any(entry -> objectid(entry) == objectid(n), keys(g.memo))
     for i in (VECEXPR_META_LENGTH + 1):length(n)
       @inbounds n[i] = find(g, n[i])
     end
-    # @assert orig == n || !inmemo
   end
   n
 end
