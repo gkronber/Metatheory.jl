@@ -11,6 +11,7 @@ function Base.push!(uf::UnionFind)::Id
 end
 
 Base.length(uf::UnionFind) = length(uf.parents)
+Base.isempty(uf::UnionFind) = isempty(uf.parents)
 
 function Base.union!(uf::UnionFind, i::Id, j::Id)
   uf.parents[j] = i

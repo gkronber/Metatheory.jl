@@ -55,29 +55,29 @@ function find_costs!(extractor::Extractor{CF,CT}) where {CF,CT}
     did_something = false
 
     for (id, eclass) in extractor.g.classes
-      min_cost = typemax(CT)
-      min_cost_node_idx = 0
+      min_cost, min_cost_node_idx = get(extractor.costs, id, (typemax(CT), 0))
+      improved = false
 
       for (idx, n) in enumerate(eclass.nodes)
-        has_all = true
-        for child_id in v_children(n)
-          has_all = has_all && haskey(extractor.costs, IdKey(child_id))
-          has_all || break
-        end
-        if has_all
+        if all(child_id -> haskey(extractor.costs, IdKey(child_id)), v_children(n))
           cost = extractor.cost_function(
             n,
             get_constant(extractor.g, v_head(n)),
             map(child_id -> extractor.costs[IdKey(child_id)][1], v_children(n)),
           )
           if cost < min_cost
+            improved = true
             min_cost = cost
             min_cost_node_idx = idx
           end
         end
       end
 
-      if min_cost != typemax(CT) && (!haskey(extractor.costs, id) || (min_cost < extractor.costs[id][1]))
+      # if min_cost != typemax(CT) && (!haskey(extractor.costs, id) || (min_cost < extractor.costs[id][1]))
+      #   extractor.costs[id] = (min_cost, min_cost_node_idx)
+      #   did_something = true
+      # end
+      if improved
         extractor.costs[id] = (min_cost, min_cost_node_idx)
         did_something = true
       end
@@ -89,6 +89,10 @@ function find_costs!(extractor::Extractor{CF,CT}) where {CF,CT}
       error("failed to compute extraction costs for eclass ", id.val)
     end
   end
+  #println("root: $(find(extractor.g, extractor.g.root))")
+  #for (id, tup) in sort(extractor.costs; by=key->key.val)
+  #  println("eclass: %$(Int(id.val)) $tup")
+  #end
 end
 
 """

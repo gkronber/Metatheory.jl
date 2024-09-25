@@ -95,7 +95,7 @@ struct PatExpr <: AbstractPat
     qop_hash = hash(qop)
     ar = length(args)
     signature = hash(qop, hash(ar))
-
+    
     n = v_new(ar)
     v_set_flag!(n, VECEXPR_FLAG_ISTREE)
     iscall && v_set_flag!(n, VECEXPR_FLAG_ISCALL)

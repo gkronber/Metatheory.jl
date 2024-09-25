@@ -71,16 +71,21 @@ end
 
 
 function merge_analysis_data!(a::EClass{D}, b::EClass{D})::Tuple{Bool,Bool,Union{D,Nothing}} where {D}
-  if !isnothing(a.data) && !isnothing(b.data)
-    new_a_data = join(a.data, b.data)
-    (a.data != new_a_data, b.data != new_a_data, new_a_data)
-  elseif isnothing(a.data) && !isnothing(b.data)
-    # a merged, b not merged
-    (true, false, b.data)
-  elseif !isnothing(a.data) && isnothing(b.data)
-    (false, true, a.data)
-  else
-    (false, false, nothing)
+  try
+    if !isnothing(a.data) && !isnothing(b.data)
+      new_a_data = join(a.data, b.data)
+      (a.data != new_a_data, b.data != new_a_data, new_a_data)
+    elseif isnothing(a.data) && !isnothing(b.data)
+      # a merged, b not merged
+      (true, false, b.data)
+    elseif !isnothing(a.data) && isnothing(b.data)
+      (false, true, a.data)
+    else
+      (false, false, nothing)
+    end
+  catch ex
+    # @show (a,b)
+    rethrow()
   end
 end
 
@@ -133,6 +138,8 @@ mutable struct EGraph{ExpressionType,Analysis}
   "If we use global buffers we may need to lock. Defaults to false."
   needslock::Bool
   lock::ReentrantLock
+  log::IO
+  debuglog::Bool
 end
 
 
@@ -153,6 +160,8 @@ function EGraph{ExpressionType,Analysis}(; needslock::Bool = false) where {Expre
     false,
     needslock,
     ReentrantLock(),
+    open("log.txt", "w"),
+    false # activate / deactivate logging of events to file
   )
 end
 EGraph(; kwargs...) = EGraph{Expr,Nothing}(; kwargs...)
@@ -174,11 +183,7 @@ EGraph(e; kwargs...) = EGraph{typeof(e),Nothing}(e; kwargs...)
 @inline get_constant(@nospecialize(g::EGraph), hash::UInt64) = g.constants[hash]
 @inline has_constant(@nospecialize(g::EGraph), hash::UInt64)::Bool = haskey(g.constants, hash)
 
-@inline function add_constant!(@nospecialize(g::EGraph), @nospecialize(c))::Id
-  h = hash(c)
-  get!(g.constants, h, c)
-  h
-end
+@inline add_constant!(@nospecialize(g::EGraph), @nospecialize(c))::Id = add_constant_hashed!(g, c, hash(c))
 
 @inline function add_constant_hashed!(@nospecialize(g::EGraph), @nospecialize(c), h::UInt64)::Id
   g.constants[h] = c
@@ -198,9 +203,11 @@ function to_expr(g::EGraph, n::VecExpr)
 end
 
 function pretty_dict(g::EGraph)
-  d = Dict{Int,Vector{Any}}()
+  d = Dict{Int,Tuple{Vector{Any},Any}}()
   for (class_id, eclass) in g.classes
-    d[class_id.val] = map(n -> to_expr(g, n), eclass.nodes)
+    #expr = try extract!(g, astsize, class_id.val) catch ex nothing end
+    expr = nothing
+    d[class_id.val] = (map(n -> to_expr(g, n), eclass.nodes), expr)
   end
   d
 end
@@ -210,7 +217,7 @@ function Base.show(io::IO, g::EGraph)
   d = pretty_dict(g)
   t = "$(typeof(g)) with $(length(d)) e-classes:"
   cs = map(sort!(collect(d); by = first)) do (k, vect)
-    "  $k => [$(Base.join(vect, ", "))]"
+    "$k => [$(Base.join(vect[1], ", "))] $(vect[2]) $(g[Id(k)].data) "
   end
   print(io, Base.join([t; cs], "\n"))
 end
@@ -231,6 +238,7 @@ function canonicalize!(g::EGraph, n::VecExpr)
   end
   v_unset_hash!(n)
   @label ret
+
   v_hash!(n)
   n
 end
@@ -275,6 +283,9 @@ function add!(g::EGraph{ExpressionType,Analysis}, n::VecExpr, should_copy::Bool)
   add_class_by_op(g, n, id)
   eclass = EClass{Analysis}(id, VecExpr[copy(n)], Pair{VecExpr,Id}[], make(g, n))
   g.classes[IdKey(id)] = eclass
+
+  g.debuglog && println(g.log, "create new singleton eclass %$id $(to_expr(g, n)) $(eclass.data)")
+
   modify!(g, eclass)
   push!(g.pending, n => id)
 
@@ -342,6 +353,7 @@ function Base.union!(
   end
 
   union!(g.uf, id_1.val, id_2.val)
+  g.debuglog && println(g.log, "union of eclasses %$(id_1.val) and %$(id_2.val)")
 
   eclass_2 = pop!(g.classes, id_2)::EClass
   eclass_1 = g.classes[id_1]::EClass
@@ -349,8 +361,8 @@ function Base.union!(
   append!(g.pending, eclass_2.parents)
 
   (merged_1, merged_2, new_data) = merge_analysis_data!(eclass_1, eclass_2)
-  merged_1 && append!(g.analysis_pending, eclass_1.parents)
-  merged_2 && append!(g.analysis_pending, eclass_2.parents)
+  merged_1 && begin append!(g.analysis_pending, eclass_1.parents); g.debuglog && println(g.log, "updating analysis for parents of $(Int(eclass_1.id)) $(map(p -> Int(p[2]), eclass_1.parents))")end
+  merged_2 && begin append!(g.analysis_pending, eclass_2.parents); g.debuglog && println(g.log, "updating analysis for parents of $(Int(eclass_2.id)) $(map(p -> Int(p[2]), eclass_2.parents))") end
 
 
   new_eclass = EClass{AnalysisType}(
@@ -360,7 +372,12 @@ function Base.union!(
     new_data,
   )
 
+  if g.debuglog && g.classes[id_1].data != new_data
+    println(g.log, "update of eclass %$(Int(id_1.val)) with new data $new_data (old: $(g.classes[id_1].data))")
+  end
+
   g.classes[id_1] = new_eclass
+  modify!(g, new_eclass)
 
   return true
 end
@@ -412,6 +429,7 @@ function process_unions!(g::EGraph{ExpressionType,AnalysisType})::Int where {Exp
       old_class_id = get!(g.memo, node, eclass_id)
       if old_class_id != eclass_id
         did_something = union!(g, old_class_id, eclass_id)
+        g.debuglog && println(g.log, "union of eclasses: %$old_class_id and %$eclass_id did_something: $did_something (process unions)")
         # TODO unique! can node dedup be moved here? compare performance
         # did_something && unique!(g[eclass_id].nodes)
         n_unions += did_something
@@ -420,26 +438,46 @@ function process_unions!(g::EGraph{ExpressionType,AnalysisType})::Int where {Exp
 
     while !isempty(g.analysis_pending)
       (node::VecExpr, eclass_id::Id) = pop!(g.analysis_pending)
+      old_id = eclass_id
       eclass_id = find(g, eclass_id)
       eclass_id_key = IdKey(eclass_id)
       eclass = g.classes[eclass_id_key]
-
       node_data = make(g, node)
-      if !isnothing(eclass.data)
-        joined_data = join(eclass.data, node_data)
-
-        if joined_data != eclass.data
-          g.classes[eclass_id_key] = EClass{AnalysisType}(eclass_id, eclass.nodes, eclass.parents, joined_data)
-          # eclass.data = joined_data
+      
+      if !isnothing(node_data)
+        if !isnothing(eclass.data)
+          try 
+            old_data = eclass.data
+            joined_data = join(eclass.data, node_data)
+            if joined_data != eclass.data
+              eclass = EClass{AnalysisType}(eclass_id, eclass.nodes, eclass.parents, joined_data)
+              g.classes[eclass_id_key] = eclass
+              g.debuglog && println(g.log, "new analysis for %$(Int(eclass_id_key.val)) $joined_data (old: $old_data)")
+              modify!(g, eclass)
+              append!(g.analysis_pending, eclass.parents)
+              g.debuglog && println(g.log, "updating analysis for parents of %$(Int(eclass.id)) $(map(p -> Int(p[2]), eclass.parents))")
+            end
+          catch ex
+            #@show Int(old_id),Int(eclass_id)
+            #@show node
+            #@show to_expr(g, node)
+            #for child in v_children(node)
+            #  @show Int(child),Int(g[child].id),g[child].data
+            #end
+            #other_id = g.memo[node]
+            #@show Int(other_id),Int(g[other_id].id),g[other_id].data
+            ## @show g[other_id]
+            #@show node_data
+            rethrow()
+          end
+        else
+          eclass = EClass{AnalysisType}(eclass_id, eclass.nodes, eclass.parents, node_data)
+          g.classes[eclass_id_key] = eclass
+          g.debuglog && println(g.log, "new analysis for %$(eclass_id_key) $node_data (old: nothing)")
           modify!(g, eclass)
           append!(g.analysis_pending, eclass.parents)
         end
-      else
-        g.classes[eclass_id_key] = EClass{AnalysisType}(eclass_id, eclass.nodes, eclass.parents, node_data)
-        # eclass.data = node_data
-        modify!(g, eclass)
       end
-
     end
   end
   n_unions
@@ -469,6 +507,11 @@ function check_analysis(g)
   for (id, eclass) in g.classes
     isnothing(eclass.data) && continue
     pass = mapreduce(x -> make(g, x), (x, y) -> join(x, y), eclass)
+    if eclass.data != pass
+      @show id
+      @show eclass.data
+      @show pass
+    end
     @assert eclass.data == pass
   end
   true

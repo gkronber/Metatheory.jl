@@ -14,16 +14,18 @@ end
 
 Base.@inline function Base.push!(b::OptBuffer{T}, el::T) where {T}
   b.i += 1
-  if b.i === b.cap
+  if b.i > b.cap
     delta = ceil(Int, b.cap * b.growth) + 1
     Base._growend!(b.v, delta)
     b.cap += delta
   end
+  @assert b.i <= b.cap
   @inbounds b.v[b.i] = el
   b
 end
 
 Base.@inline function Base.pop!(b::OptBuffer{T})::T where {T}
+  @assert b.i >= 1 && b.i <= b.cap
   # THIS IS UNSAFE! ASSUMES ALWAYS THAT b.i is > 1
   val = @inbounds b.v[b.i]
   b.i -= 1
@@ -34,4 +36,3 @@ end
 Base.isempty(b::OptBuffer{T}) where {T} = b.i === 0
 Base.empty!(b::OptBuffer{T}) where {T} = (b.i = 0)
 @inline Base.length(b::OptBuffer{T}) where {T} = b.i
-Base.iterate(b::OptBuffer{T}, i=1) where {T} = iterate(b.v[1:b.i], i)

@@ -25,12 +25,14 @@ function cansaturate end
 
 """
     cansearch(s::AbstractScheduler, i::Int)
-    cansearch(s::AbstractScheduler, i::Int, eclass_id::Id)
+    cansearch(s::AbstractScheduler, i::Int, eclass_id::Id, dir::Int)
 
 Given a theory `t` and a rule `r` with index `i` in the theory,
 should return `false` if the search for rule with index `i` should be skipped
 for the current iteration. An extra `eclass_id::Id` arguments can be passed 
-in order to filter out specific e-classes.
+in order to filter out specific e-classes. For bidirectional rules `dir` refers 
+to the direction (for left to right application: `dir=1`, for right to left 
+application: `dir=-1`)
 """
 function cansearch end
 
@@ -69,6 +71,7 @@ function rebuild! end
 @inline inform!(::AbstractScheduler, ::Int, ::Id, ::Int) = nothing
 @inline setiter!(::AbstractScheduler, ::Int) = nothing
 @inline rebuild!(::AbstractScheduler) = nothing
+@inline cansearch(s::AbstractScheduler, rule_idx::Int, eclass_id::Id, ::Int) = cansearch(s, rule_idx, eclass_id)
 
 
 

@@ -51,7 +51,6 @@ canonical_t = @theory x y xs ys begin
   (+)(xs...) => Expr(:call, :+, sort!(xs; lt = customlt)...)
 end
 
-
 maths_theory = mult_t ∪ plus_t ∪ minus_t ∪ mulplus_t ∪ pow_t
 
 postprocess_maths(x) = rewrite(x, canonical_t)
