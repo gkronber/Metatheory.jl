@@ -1,7 +1,6 @@
 # Functional implementation of https://egraphs-good.github.io/
 # https://dl.acm.org/doi/10.1145/3434304
 
-
 """
     modify!(eclass::EClass{Analysis})
 
@@ -388,7 +387,6 @@ function rebuild_classes!(g::EGraph)
   end
 
   for (eclass_id, eclass) in g.classes
-    # old_len = length(eclass.nodes)
     for n in eclass.nodes
       canonicalize!(g, n)
     end
