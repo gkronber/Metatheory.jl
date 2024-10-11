@@ -40,6 +40,7 @@ they represent. The [`EGraph`](@ref) itself comes with pretty printing for human
 """
 struct EClass{D}
   id::Id
+  "Vector of canoncialized and unique e-nodes."
   nodes::Vector{VecExpr}
   parents::Vector{Id} # The original Ids of parent enodes.
   data::Union{D,Nothing}
@@ -114,7 +115,7 @@ mutable struct EGraph{ExpressionType,Analysis}
   uf::UnionFind
   "map from eclass id to eclasses"
   classes::Dict{IdKey,EClass{Analysis}}
-  "vector of the original e-nodes"
+  "vector of the canonicalized e-nodes"
   nodes::Vector{VecExpr}
   "hashcons mapping e-nodes to their e-class id"
   memo::Dict{VecExpr,Id}
@@ -409,12 +410,14 @@ function process_unions!(g::EGraph{ExpressionType,AnalysisType})::Int where {Exp
 
   while !isempty(g.pending) || !isempty(g.analysis_pending)
     while !isempty(g.pending)
-      enode_id = pop!(g.pending)
-      node = copy(g.nodes[enode_id])
+      eclass_id = pop!(g.pending)
+      # node = copy(g.nodes[enode_id])
+      node = g.nodes[eclass_id]
+
       canonicalize!(g, node)
-      memo_class = get!(g.memo, node, enode_id)
-      if memo_class != enode_id
-        did_something = union!(g, memo_class, enode_id)
+      memo_class = get!(g.memo, node, eclass_id) # TODO: egg overwrites the existing value
+      if memo_class != eclass_id
+        did_something = union!(g, memo_class, eclass_id)
         # TODO unique! can node dedup be moved here? compare performance
         # did_something && unique!(g[eclass_id].nodes)
         n_unions += did_something
@@ -468,9 +471,9 @@ function check_parents(g::EGraph)::Bool
       any(n -> any(ch -> ch == id.val, v_children(n)), parent_class.nodes) || error("no node in the parent references the eclass") # nodes are canonicalized
 
       parent_node = g.nodes[nid]
-      parent_node_copy = copy(parent_node)
-      canonicalize!(g, parent_node_copy)
-      (parent_node_copy in parent_class.nodes) || error("the node from the parent list does not occur in the parent nodes") # might fail because parent_node is probably not canonical
+      # parent_node_copy = copy(parent_node)
+      # canonicalize!(g, parent_node_copy)
+      (parent_node in parent_class.nodes) || error("the node from the parent list does not occur in the parent nodes") # might fail because parent_node is probably not canonical
     end
   end
 
