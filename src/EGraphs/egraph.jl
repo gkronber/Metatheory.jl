@@ -385,9 +385,6 @@ function rebuild_classes!(g::EGraph)
 
   trimmed_nodes = 0
   for (eclass_id, eclass) in g.classes
-    for n in eclass.nodes
-      canonicalize!(g, n)
-    end
     trimmed_nodes += length(eclass.nodes)
     # TODO Sort to go in order?
     unique!(eclass.nodes)
