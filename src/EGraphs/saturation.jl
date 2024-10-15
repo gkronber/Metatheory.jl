@@ -169,7 +169,7 @@ function eqsat_apply!(
     if n_matches % CHECK_GOAL_EVERY_N_MATCHES == 0 && params.goal(g)
       @debug "Goal reached"
       rep.reason = :goalreached
-      return
+      break
     end
 
     delimiter = ematch_buffer.v[k]
@@ -199,11 +199,12 @@ function eqsat_apply!(
 
     res = apply_rule!(bindings, g, rule, id, direction)
 
-    k = next_delimiter_idx
     if res.halt_reason !== :nothing
       rep.reason = res.halt_reason
-      return
+      break
     end
+
+    !iszero(res.l) && !iszero(res.r) && union!(g, res.l, res.r)
 
     if params.enodelimit > 0 && length(g.memo) > params.enodelimit
       @debug "Too many enodes"
@@ -211,12 +212,13 @@ function eqsat_apply!(
       break
     end
 
-    !iszero(res.l) && !iszero(res.r) && union!(g, res.l, res.r)
+    k = next_delimiter_idx
+
+    
   end
   if params.goal(g)
     @debug "Goal reached"
     rep.reason = :goalreached
-    return
   end
 
   empty!(ematch_buffer)
@@ -247,10 +249,13 @@ function eqsat_step!(
   if report.reason === nothing && cansaturate(scheduler) && isempty(g.pending)
     report.reason = :saturated
   end
-  @timeit report.to "Rebuild" rebuild!(g; should_check_memo = params.check_memo, should_check_analysis = params.check_analysis)
+ 
+  @timeit report.to "Rebuild" rebuild!(g; 
+    should_check_memo = params.check_memo && report.reason !=:enodelimit, # rules have been applied only partially when the enode limit is reached (TODO)
+    should_check_analysis = params.check_analysis && report.reason !=:enodelimit)
 
   Schedulers.rebuild!(scheduler)
-
+    
   @debug "Smallest expression is" extract!(g, astsize)
 
   return report
@@ -277,7 +282,7 @@ function saturate!(g::EGraph, theory::Theory, params = SaturationParams())
     curr_iter += 1
 
     @debug "================ EQSAT ITERATION $curr_iter  ================"
-    @debug g
+    # @debug g
 
     report = eqsat_step!(g, theory, curr_iter, sched, params, report, ematch_buffer)
 

@@ -100,11 +100,11 @@ end
 check_constant_exprs!(buf, p::PatLiteral) = push!(buf, :(has_constant(g, $(last(p.n))) || return 0))
 check_constant_exprs!(buf, ::AbstractPat) = buf
 function check_constant_exprs!(buf, p::PatExpr)
-  if !(p.head isa AbstractPat)
-    push!(buf, :(has_constant(g, $(p.head_hash)) || has_constant(g, $(p.quoted_head_hash)) || return 0))
-  end
   for child in children(p)
     check_constant_exprs!(buf, child)
+  end
+  if !(p.head isa AbstractPat)
+    push!(buf, :(has_constant(g, $(p.head_hash)) || has_constant(g, $(p.quoted_head_hash)) || return 0))
   end
   buf
 end
@@ -213,8 +213,8 @@ function bind_expr(addr, p::PatExpr, memrange)
       n = eclass.nodes[$(Symbol(:enode_idx, addr))]
 
       v_flags(n) === $(v_flags(p.n)) || @goto $(Symbol(:skip_node, addr))
-      v_signature(n) === $(v_signature(p.n)) || @goto $(Symbol(:skip_node, addr))
-      v_head(n) === $(v_head(p.n)) || (v_head(n) === $(p.quoted_head_hash) || @goto $(Symbol(:skip_node, addr)))
+      v_signature(n) === $(v_signature(p.n)) || @goto $(Symbol(:skip_node, addr)) # TODO better to check signature before flags? check perf.
+      v_head(n) === $(v_head(p.n)) || v_head(n) === $(p.quoted_head_hash) || @goto $(Symbol(:skip_node, addr))
 
       # Node has matched.
       $([:($(Symbol(:σ, j)) = n[$i + $VECEXPR_META_LENGTH]) for (i, j) in enumerate(memrange)]...)
@@ -259,7 +259,6 @@ function check_var_expr(addr, predicate::Function)
       #     break
       #   end
       # end
-      # $(Symbol(:enode_idx, addr)) = 1
       pc += 0x0001
       @goto compute
     end
