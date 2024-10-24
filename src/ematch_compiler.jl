@@ -100,6 +100,7 @@ end
 check_constant_exprs!(buf, p::PatLiteral) = push!(buf, :(has_constant(g, $(last(p.n))) || return 0))
 check_constant_exprs!(buf, ::AbstractPat) = buf
 function check_constant_exprs!(buf, p::PatExpr)
+  # TODO: constants that occur multiple times only have to be checked once.
   for child in children(p)
     check_constant_exprs!(buf, child)
   end
