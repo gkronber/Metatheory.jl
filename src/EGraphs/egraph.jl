@@ -41,7 +41,7 @@ they represent. The [`EGraph`](@ref) itself comes with pretty printing for human
 mutable struct EClass{D}
   const id::Id
   const nodes::Vector{VecExpr}
-  parents::Vector{Pair{VecExpr,Id}} # the parent nodes and eclasses for upward merging
+  const parents::Vector{Pair{VecExpr,Id}} # the parent nodes and eclasses for upward merging
   data::Union{D,Nothing}
 end
 
@@ -385,6 +385,11 @@ function rebuild_classes!(g::EGraph)
 
   trimmed_nodes = 0
   for (eclass_id, eclass) in g.classes
+    # TODO this is necessary the parents lists and the nodes lists do not contain the same objects.
+    # As a consequence, even though all necessary nodes in the parents lists are canonicalized, some nodes in the classes might be missed.
+    # The underlying reason is that we call unique!() separately for the parent list nodes and the eclass nodes.
+    # It would be good to remove this loop.
+    foreach(n -> canonicalize!(g,n), eclass.nodes)
     trimmed_nodes += length(eclass.nodes)
     # TODO Sort to go in order?
     unique!(eclass.nodes)
@@ -430,44 +435,27 @@ end
 function repair_parents!(g::EGraph, id::Id)
   n_unions = 0
   eclass = g[id] # id does not have to be an eclass id anymore if we merged classes below
-  for (p_node, _) in eclass.parents
-    memo_class = pop!(g.memo, p_node, 0)
-    # memo_class = get(g.memo, p_node, 0)  # TODO: could we be messy instead and just canonicalize the node and add again (without pop!)?
+  for (p_node, p_class) in eclass.parents
+    # different enodes might become equivalent through canonicalization, then it could happen that the node does not existing in memo
+    delete!(g.memo, p_node)  # TODO: could we be messy instead and just canonicalize the node and add again (without delete)?
     
-    # only canonicalize node and update in memo if the node still exists
-    if memo_class > 0
-      canonicalize!(g, p_node)
-      g.memo[p_node] = find(g, memo_class)
-    end
+    canonicalize!(g, p_node)
+    g.memo[p_node] = find(g, p_class)
   end
 
   # sort and collect unique nodes in new parents list (merging eclasses when finding duplicate nodes) 
   if !isempty(eclass.parents) 
-    new_parents = Vector{Pair{VecExpr,Id}}()
-    sort!(eclass.parents, by=pair->pair[1])
-    (prev_node, prev_id) = first(eclass.parents)
-    
-    # TODO double check whether we need canonical eclass ids in parents list (find is called in rebuild above anyway)
-    push!(new_parents, prev_node => find(g, prev_id))
-    
-    for i in Iterators.drop(eachindex(eclass.parents), 1)
-      (cur_node, cur_id) = eclass.parents[i]
-      
-      if hash(cur_node) == hash(prev_node) && cur_node == prev_node
-        if union!(g, cur_id, prev_id) 
-          n_unions += 1
-        end
-      else
-        push!(new_parents, cur_node => find(g, cur_id)) # find not necessary?
-        prev_node, prev_id = cur_node, cur_id
+    new_parents = Dict{VecExpr,Id}()
+    for (p_node, p_class) in eclass.parents
+      canonicalize!(g, p_node)
+      if haskey(new_parents, p_node)
+        union!(g, p_class, new_parents[p_node])
       end
+      new_parents[p_node] = find(g, p_class)
     end
-    
-    # TODO: remove assertions
-    # @assert length(unique(pair -> pair[1], new_parents)) == length(new_parents)  "not unique: $new_parents"
-    # @assert all(pair -> pair[2] == find(g, pair[2]), new_parents)  "not refering to eclasses: $(new_parents)\n $g"
-    
-    eclass.parents = new_parents
+
+    empty!(eclass.parents)
+    append!(eclass.parents, new_parents)
   end
   n_unions
 end
@@ -529,7 +517,7 @@ function check_memo(g::EGraph)::Bool
     for node in class.nodes
       old_id = get!(test_memo, node, id.val)
       if old_id != id.val
-        @assert find(g, old_id) == find(g, id.val) "Unexpected equivalence $node $(g[find(g, id.val)].nodes) $(g[find(g, old_id)].nodes)"
+        @assert find(g, old_id) == find(g, id.val) "Unexpected equivalence $node\n$(g[find(g, id.val)].nodes)\n$(g[find(g, old_id)].nodes)"
       end
     end
   end

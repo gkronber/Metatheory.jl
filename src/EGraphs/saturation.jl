@@ -282,7 +282,7 @@ function saturate!(g::EGraph, theory::Theory, params = SaturationParams())
     curr_iter += 1
 
     @debug "================ EQSAT ITERATION $curr_iter  ================"
-    # @debug g
+    @debug g
 
     report = eqsat_step!(g, theory, curr_iter, sched, params, report, ematch_buffer)
 
