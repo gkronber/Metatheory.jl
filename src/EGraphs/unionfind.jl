@@ -1,5 +1,5 @@
 struct UnionFind
-  parents::Vector{Id}
+  parents::Vector{Int64}
 end
 
 UnionFind() = UnionFind(Id[])
@@ -17,10 +17,20 @@ function Base.union!(uf::UnionFind, i::Id, j::Id)
   i
 end
 
-function find(uf::UnionFind, i::Id)
+# this compresses the find path
+function find!(uf::UnionFind, i::Id)::Id
   # path splitting
-  while i != uf.parents[i]
-    (i, uf.parents[i]) = (uf.parents[i], uf.parents[uf.parents[i]])
+  while i != @inbounds uf.parents[i]
+    @inbounds (i, uf.parents[i]) = (uf.parents[i], uf.parents[uf.parents[i]])
+    # i = uf.parents[i]
+  end
+
+  i
+end
+
+function find(uf::UnionFind, i::Id)::Id
+  while i != @inbounds uf.parents[i]
+    i = @inbounds uf.parents[i]
   end
 
   i

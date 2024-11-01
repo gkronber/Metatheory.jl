@@ -414,7 +414,7 @@ function process_unions!(g::EGraph{ExpressionType,AnalysisType})::Int where {Exp
   # We separate the worklist into two lists for repair and update of semantic analysis values.
   # The upwards update of semantic analysis values may require visiting fewer eclasses. 
   while !isempty(g.pending) || !isempty(g.analysis_pending)
-    todo = collect(unique(id -> find(g, id), g.pending))
+    todo = collect(unique(id -> find!(g.uf, id), g.pending))
     @debug "Worklist reduced from $(length(g.pending)) to $(length(todo)) entries."
     empty!(g.pending)
     
@@ -422,7 +422,7 @@ function process_unions!(g::EGraph{ExpressionType,AnalysisType})::Int where {Exp
       n_unions += repair_parents!(g, id)
     end
 
-    todo = collect(unique(id -> find(g, id), g.analysis_pending))
+    todo = collect(unique(id -> find!(g.uf, id), g.analysis_pending))
     @debug "Analysis worklist reduced from $(length(g.analysis_pending)) to $(length(todo)) entries."
     empty!(g.analysis_pending)
     for id in todo
@@ -462,7 +462,7 @@ end
 
 function update_analysis_upwards!(g::EGraph, id::Id)
   for (p_node, p_id) in g[id].parents
-    p_id = find(g, p_id)
+    p_id = find!(g.uf, p_id)
     eclass = g.classes[IdKey(p_id)]
 
     node_data = make(g, p_node)
