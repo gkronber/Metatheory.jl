@@ -236,8 +236,7 @@ function lookup(g::EGraph, n::VecExpr)::Id
   canonicalize!(g, n)
 
   id = get(g.memo, n, zero(Id))
-  id
-#  iszero(id) ? id : find(g, id) # find necessary because g.memo values are not necessarily canonical
+  iszero(id) ? id : find(g, id) # find necessary because g.memo values are not necessarily canonical
 end
 
 
@@ -457,12 +456,8 @@ function repair_parents!(g::EGraph, id::Id)
         union!(g, canon_p_class, old_entry)
         new_parents[p_node] = find!(g.uf, canon_p_class) # update eclass again because it might have been changed in union()
       end
-      # if haskey(new_parents, p_node)
-      #   union!(g, p_class, new_parents[p_node])
-      # end
-      # new_parents[p_node] = find(g, p_class)
     end
-
+    
     empty!(eclass.parents)
     append!(eclass.parents, new_parents)
   end
