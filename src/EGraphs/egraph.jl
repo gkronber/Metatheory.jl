@@ -304,13 +304,13 @@ insert the literal into the [`EGraph`](@ref).
 function addexpr!(g::EGraph, se)::Id
   e = preprocess(se) # TODO: type stability issue?
 
-  isexpr(e) || return add!(g, VecExpr(Id(0), Id(0), Id(0), add_constant!(g, e), Array{Id}(undef, 0)), false)
+  isexpr(e) || return add!(g, v_new_literal(add_constant!(g, e)), false)
 
   args = iscall(e) ? arguments(e) : children(e)
   ar = length(args)
   h = iscall(e) ? operation(e) : head(e)
   signature = hash(maybe_quote_operation(h), hash(ar)) # get the signature from op and arity
-  n = v_new(true, iscall(e), signature, add_constant!(g, h), ar)
+  n = v_new_expr(iscall(e), signature, add_constant!(g, h), ar)
  
   for i in v_children_range(n)
     @inbounds n.children[i] = addexpr!(g, args[i])
