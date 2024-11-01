@@ -111,24 +111,24 @@ for implementation details.
 """
 mutable struct EGraph{ExpressionType,Analysis}
   "stores the equality relations over e-class ids"
-  uf::UnionFind
+  const uf::UnionFind
   "map from eclass id to eclasses"
-  classes::Dict{IdKey,EClass{Analysis}}
+  const classes::Dict{IdKey,EClass{Analysis}}
   "hashcons mapping e-nodes to their e-class id"
-  memo::Dict{VecExpr,Id}
+  const memo::Dict{VecExpr,Id}
   "Hashcons the constants in the e-graph"
-  constants::Dict{UInt64,Any}
+  const constants::Dict{UInt64,Any}
   "E-classes whose parent nodes have to be reprocessed."
-  pending::Vector{Id}
+  const pending::Vector{Id}
   "E-classes whose parent nodes have to be reprocessed for analysis values."
-  analysis_pending::Vector{Id}
+  const analysis_pending::Vector{Id}
   root::Id
   "a cache mapping signatures (function symbols and their arity) to e-classes that contain e-nodes with that function symbol."
-  classes_by_op::Dict{IdKey,Vector{Id}}
+  const classes_by_op::Dict{IdKey,Vector{Id}}
   clean::Bool
   "If we use global buffers we may need to lock. Defaults to false."
   needslock::Bool
-  lock::ReentrantLock
+  const lock::ReentrantLock
 end
 
 
@@ -236,7 +236,8 @@ function lookup(g::EGraph, n::VecExpr)::Id
   canonicalize!(g, n)
 
   id = get(g.memo, n, zero(Id))
-  iszero(id) ? id : find(g, id) # find necessary because g.memo values are not necessarily canonical
+  id
+#  iszero(id) ? id : find(g, id) # find necessary because g.memo values are not necessarily canonical
 end
 
 
@@ -440,18 +441,26 @@ function repair_parents!(g::EGraph, id::Id)
     delete!(g.memo, p_node)  # TODO: could we be messy instead and just canonicalize the node and add again (without delete)?
     
     canonicalize!(g, p_node)
-    g.memo[p_node] = find(g, p_class)
+    g.memo[p_node] = find!(g.uf, p_class)
   end
 
   # sort and collect unique nodes in new parents list (merging eclasses when finding duplicate nodes) 
   if !isempty(eclass.parents) 
-    new_parents = Dict{VecExpr,Id}()
+    new_parents = Dict{VecExpr,Id}() # TODO could allocate this once as a buffer
+    sizehint!(new_parents, length(eclass.parents))
+    
     for (p_node, p_class) in eclass.parents
       canonicalize!(g, p_node)
-      if haskey(new_parents, p_node)
-        union!(g, p_class, new_parents[p_node])
+      canon_p_class = find!(g.uf, p_class)
+      old_entry = get!(new_parents, p_node, canon_p_class)
+      if old_entry != canon_p_class
+        union!(g, canon_p_class, old_entry)
+        new_parents[p_node] = find!(g.uf, canon_p_class) # update eclass again because it might have been changed in union()
       end
-      new_parents[p_node] = find(g, p_class)
+      # if haskey(new_parents, p_node)
+      #   union!(g, p_class, new_parents[p_node])
+      # end
+      # new_parents[p_node] = find(g, p_class)
     end
 
     empty!(eclass.parents)
