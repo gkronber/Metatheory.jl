@@ -56,10 +56,10 @@ function rebuild! end
 # Defaults
 # ===========================================================================
 
-@inline search_matches!(::AbstractScheduler, ::OptBuffer{UInt128}, ::Int) = 0
-@inline cansaturate(::AbstractScheduler) = true
-@inline setiter!(::AbstractScheduler, ::Int) = nothing
-@inline rebuild!(::AbstractScheduler) = nothing
+search_matches!(::AbstractScheduler, ::OptBuffer{UInt128}, ::Int) = 0
+cansaturate(::AbstractScheduler) = true
+setiter!(::AbstractScheduler, ::Int) = nothing
+rebuild!(::AbstractScheduler) = nothing
 
 
 

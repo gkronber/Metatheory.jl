@@ -164,19 +164,19 @@ EGraph{ExpressionType}(e; kwargs...) where {ExpressionType} = EGraph{ExpressionT
 EGraph(e; kwargs...) = EGraph{typeof(e),Nothing}(e; kwargs...)
 
 # Fallback implementation for analysis methods make and modify
-@inline make(::EGraph, ::VecExpr) = nothing
-@inline modify!(::EGraph, ::EClass{Analysis}) where {Analysis} = nothing
+make(::EGraph, ::VecExpr) = nothing
+modify!(::EGraph, ::EClass{Analysis}) where {Analysis} = nothing
 
-@inline get_constant(@nospecialize(g::EGraph), hash::UInt64) = g.constants[hash]
-@inline has_constant(@nospecialize(g::EGraph), hash::UInt64)::Bool = haskey(g.constants, hash)
+get_constant(@nospecialize(g::EGraph), hash::UInt64) = g.constants[hash]
+has_constant(@nospecialize(g::EGraph), hash::UInt64)::Bool = haskey(g.constants, hash)
 
-@inline function add_constant!(@nospecialize(g::EGraph), @nospecialize(c))::Id
+function add_constant!(@nospecialize(g::EGraph), @nospecialize(c))::Id
   h = hash(c)
   get!(g.constants, h, c)
   h
 end
 
-@inline function add_constant_hashed!(@nospecialize(g::EGraph), @nospecialize(c), h::UInt64)::Id
+function add_constant_hashed!(@nospecialize(g::EGraph), @nospecialize(c), h::UInt64)::Id
   g.constants[h] = c
   h
 end
@@ -216,10 +216,10 @@ end
 """
 Returns the canonical e-class id for a given e-class.
 """
-@inline find(g::EGraph, a::Id)::Id = find(g.uf, a)
-@inline find(@nospecialize(g::EGraph), @nospecialize(a::EClass))::Id = find(g, a.id)
+find(g::EGraph, a::Id)::Id = find(g.uf, a)
+find(@nospecialize(g::EGraph), @nospecialize(a::EClass))::Id = find(g, a.id)
 
-@inline Base.getindex(g::EGraph, i::Id) = g.classes[IdKey(find(g, i))]
+Base.getindex(g::EGraph, i::Id) = g.classes[IdKey(find(g, i))]
 
 function canonicalize!(g::EGraph, n::VecExpr)
   v_isexpr(n) || @goto ret
