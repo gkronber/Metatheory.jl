@@ -61,6 +61,24 @@ end
   end
 end
 
+@testset "Simple congruence loop - rebuilding" begin
+  g = EGraph()
+  aid = addexpr!(g, :a)
+  bid = addexpr!(g, :b)
+  ec1 = addexpr!(g, :(a * b))
+  ec2 = addexpr!(g, :(b * a))
+
+  union!(g, aid, ec1)
+  union!(g, bid, ec2)
+
+  union!(g, ec1, ec2)
+  @testset "Internals" begin
+    @test find(g, ec1) == find(g, ec2)
+    rebuild!(g)
+    @assert length(g[ec1].nodes) == 3
+    @test length(g[ec1].parents) == 1
+  end
+end
 
 @testset "Simple nested congruence" begin
   apply(n, f, x) = n == 0 ? x : apply(n - 1, f, f(x))

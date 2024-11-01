@@ -26,7 +26,7 @@ isground(p::AbstractPat) = false
 struct PatLiteral <: AbstractPat
   value
   n::VecExpr
-  PatLiteral(val) = new(val, VecExpr(Id[0, 0, 0, hash(val)]))
+  PatLiteral(val) = new(val, VecExpr(Id(0), Id(0), Id(0), hash(val), Array{Id}(undef, 0))) # flags, signature, head
 end
 
 PatLiteral(p::AbstractPat) = throw(DomainError(p, "Cannot construct a pattern literal of another pattern object."))
@@ -96,14 +96,14 @@ struct PatExpr <: AbstractPat
     ar = length(args)
     signature = hash(qop, hash(ar))
 
-    n = v_new(ar)
-    v_set_flag!(n, VECEXPR_FLAG_ISTREE)
-    iscall && v_set_flag!(n, VECEXPR_FLAG_ISCALL)
-    v_set_head!(n, op_hash)
-    v_set_signature!(n, signature)
+    n = v_new(true, iscall, signature, op_hash, ar)
+    # v_set_flag!(n, VECEXPR_FLAG_ISTREE)
+    # iscall && v_set_flag!(n, VECEXPR_FLAG_ISCALL)
+    # v_set_head!(n, op_hash)
+    # v_set_signature!(n, signature)
 
     for i in v_children_range(n)
-      @inbounds n[i] = 0
+      @inbounds n.children[i] = 0
     end
 
     new(op, op_hash, qop, qop_hash, args, all(isground, args), n)

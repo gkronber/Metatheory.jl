@@ -415,6 +415,7 @@ macro rule(args...)
 
 
   ematcher_left_expr = esc(ematch_compile(lhs, pvars, 1))
+  # @show ematcher_left_expr
 
   if op in (:(==), :(!=)) # Bidirectional rule
     ematcher_right_expr = esc(ematch_compile(rhs, pvars, -1))

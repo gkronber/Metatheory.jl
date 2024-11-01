@@ -211,14 +211,14 @@ function bind_expr(addr, p::PatExpr, memrange)
     if $(Symbol(:enode_idx, addr)) <= eclass_length
       push!(stack, pc)
 
-      n = eclass.nodes[$(Symbol(:enode_idx, addr))]
+      n = @inbounds eclass.nodes[$(Symbol(:enode_idx, addr))]
 
       v_signature(n) === $(v_signature(p.n)) || @goto $(Symbol(:skip_node, addr))
       v_head(n) === $(v_head(p.n)) || v_head(n) === $(p.quoted_head_hash) || @goto $(Symbol(:skip_node, addr))
       v_flags(n) === $(v_flags(p.n)) || @goto $(Symbol(:skip_node, addr))
 
       # Node has matched.
-      $([:($(Symbol(:σ, j)) = n[$i + $VECEXPR_META_LENGTH]) for (i, j) in enumerate(memrange)]...)
+      $([:($(Symbol(:σ, j)) = @inbounds n.children[$i]) for (i, j) in enumerate(memrange)]...)
       pc += 0x0001
       $(Symbol(:enode_idx, addr)) += 1
       @goto compute
@@ -274,7 +274,7 @@ function check_var_expr(addr, T::Type)
     eclass_length = length(eclass.nodes)
     if $(Symbol(:enode_idx, addr)) <= eclass_length
       push!(stack, pc)
-      n = eclass.nodes[$(Symbol(:enode_idx, addr))]
+      n = @inbounds eclass.nodes[$(Symbol(:enode_idx, addr))]
 
       if !v_isexpr(n)
         hn = Metatheory.EGraphs.get_constant(g, v_head(n))

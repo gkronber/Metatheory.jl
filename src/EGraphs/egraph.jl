@@ -223,8 +223,8 @@ Base.getindex(g::EGraph, i::Id) = g.classes[IdKey(find(g, i))]
 
 function canonicalize!(g::EGraph, n::VecExpr)
   v_isexpr(n) || @goto ret
-  for i in (VECEXPR_META_LENGTH + 1):length(n)
-    @inbounds n[i] = find(g, n[i])
+  for i in v_children_range(n)
+    @inbounds n.children[i] = find(g, n.children[i])
   end
   v_unset_hash!(n)
   @label ret
@@ -304,19 +304,16 @@ insert the literal into the [`EGraph`](@ref).
 function addexpr!(g::EGraph, se)::Id
   e = preprocess(se) # TODO: type stability issue?
 
-  isexpr(e) || return add!(g, VecExpr(Id[Id(0), Id(0), Id(0), add_constant!(g, e)]), false)
+  isexpr(e) || return add!(g, VecExpr(Id(0), Id(0), Id(0), add_constant!(g, e), Array{Id}(undef, 0)), false)
 
   args = iscall(e) ? arguments(e) : children(e)
   ar = length(args)
-  n = v_new(ar)
-  v_set_flag!(n, VECEXPR_FLAG_ISTREE)
-  iscall(e) && v_set_flag!(n, VECEXPR_FLAG_ISCALL)
   h = iscall(e) ? operation(e) : head(e)
-  v_set_head!(n, add_constant!(g, h))
-  # get the signature from op and arity
-  v_set_signature!(n, hash(maybe_quote_operation(h), hash(ar)))
+  signature = hash(maybe_quote_operation(h), hash(ar)) # get the signature from op and arity
+  n = v_new(true, iscall(e), signature, add_constant!(g, h), ar)
+ 
   for i in v_children_range(n)
-    @inbounds n[i] = addexpr!(g, args[i - VECEXPR_META_LENGTH])
+    @inbounds n.children[i] = addexpr!(g, args[i])
   end
 
   add!(g, n, false)
@@ -574,8 +571,8 @@ function lookup_pat(g::EGraph{ExpressionType}, p::PatExpr)::Id where {Expression
   has_op || return 0
 
   for i in v_children_range(p.n)
-    @inbounds p.n[i] = lookup_pat(g, args[i - VECEXPR_META_LENGTH])
-    p.n[i] <= 0 && return 0
+    @inbounds p.n.children[i] = lookup_pat(g, args[i])
+    p.n.children[i] <= 0 && return 0
   end
 
   id = lookup(g, p.n)
@@ -588,6 +585,6 @@ function lookup_pat(g::EGraph{ExpressionType}, p::PatExpr)::Id where {Expression
 end
 
 function lookup_pat(g::EGraph, p::PatLiteral)::Id
-  h = last(p.n)
+  h = v_head(p.n)
   has_constant(g, h) ? lookup(g, p.n) : 0
 end

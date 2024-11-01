@@ -82,17 +82,18 @@ function instantiate_enode!(bindings, g::EGraph{ExpressionType}, p::PatExpr)::Id
   add_constant_hashed!(g, p.head, p.head_hash)
 
   for i in v_children_range(p.n)
-    @inbounds p.n[i] = instantiate_enode!(bindings, g, p.children[i - VECEXPR_META_LENGTH])
+    @inbounds p.n.children[i] = instantiate_enode!(bindings, g, p.children[i])
   end
   add!(g, p.n, true)
 end
 
 function instantiate_enode!(bindings, g::EGraph{Expr}, p::PatExpr)::Id
   add_constant_hashed!(g, p.quoted_head, p.quoted_head_hash)
-  v_set_head!(p.n, p.quoted_head_hash)
+  
+  v_set_head!(p.n, p.quoted_head_hash)  # TODO: why do we need to update the pattern node here, shouldn't we always use either quoted or unquoted hash?
 
   for i in v_children_range(p.n)
-    @inbounds p.n[i] = instantiate_enode!(bindings, g, p.children[i - VECEXPR_META_LENGTH])
+    @inbounds p.n.children[i] = instantiate_enode!(bindings, g, p.children[i])
   end
   add!(g, p.n, true)
 end
