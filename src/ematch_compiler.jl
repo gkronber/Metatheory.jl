@@ -97,15 +97,15 @@ function ematch_compile(p, pvars, direction)
 end
 
 
-check_constant_exprs!(buf, p::PatLiteral) = push!(buf, :(has_constant(g, $(last(p.n))) || return 0))
+get_check_constant_expressions(p::PatLiteral) = [:(has_constant(g, $((v_head(p.n)))) || return 0)]
+get_check_constant_expressions(::AbstractPat) = []
+get_check_constant_expressions(p::PatExpr) = [:(has_constant(g, $(p.head_hash)) || has_constant(g, $(p.quoted_head_hash)) || return 0), Iterators.flatten(map(get_check_constant_expressions, children(p)))...]
+
+check_constant_exprs!(buf, p::PatLiteral) = push!(buf, :(has_constant(g, $(v_head(p.n))) || return 0))
 check_constant_exprs!(buf, ::AbstractPat) = buf
 function check_constant_exprs!(buf, p::PatExpr)
-  # TODO: constants that occur multiple times only have to be checked once.
-  for child in children(p)
-    check_constant_exprs!(buf, child)
-  end
-  if !(p.head isa AbstractPat)
-    push!(buf, :(has_constant(g, $(p.head_hash)) || has_constant(g, $(p.quoted_head_hash)) || return 0))
+  for check_constant_expr in unique(get_check_constant_expressions(p))
+    push!(buf, check_constant_expr)
   end
   buf
 end
